@@ -21,10 +21,6 @@ jobs:
     name: Build React Vite app
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: dms-web
-
     env:
       VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
       VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
