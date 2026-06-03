@@ -135,6 +135,7 @@ function App() {
   );
   const [guardandoNuevaEntrega, setGuardandoNuevaEntrega] = useState(false);
   const [intentoGuardar, setIntentoGuardar] = useState(false);
+  const [sidebarAbierta, setSidebarAbierta] = useState(false);
 
   useEffect(() => {
     async function cargarDatosIniciales() {
@@ -429,22 +430,39 @@ function App() {
 
   return (
     <main className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-  <div className="brand-logo">
-    <img src={dmsLogo} alt="DMS - Delivery Management System" />
-  </div>
+      {sidebarAbierta && (
+        <div
+          className="sidebar-overlay"
+          onClick={() => setSidebarAbierta(false)}
+          aria-hidden="true"
+        />
+      )}
 
-      <div className="brand-text">
-        <strong>DMS</strong>
-        <span>Delivery Management System</span>
-      </div>
-    </div>
+      <aside className={`sidebar${sidebarAbierta ? " abierta" : ""}`}>
+        <div className="sidebar-top">
+          <div className="brand">
+            <div className="brand-logo">
+              <img src={dmsLogo} alt="DMS - Delivery Management System" />
+            </div>
+            <div className="brand-text">
+              <strong>DMS</strong>
+              <span>Delivery Management System</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="sidebar-close-button"
+            onClick={() => setSidebarAbierta(false)}
+            aria-label="Cerrar menú"
+          >
+            <i className="fa-solid fa-xmark"></i>
+          </button>
+        </div>
 
         <button
           type="button"
           className="sidebar-primary-button"
-          onClick={abrirModalNuevaEntrega}
+          onClick={() => { setSidebarAbierta(false); abrirModalNuevaEntrega(); }}
         >
           + Nueva entrega
         </button>
@@ -454,12 +472,20 @@ function App() {
             <span>▦</span>
             Entregas
           </button>
-
         </nav>
       </aside>
 
       <section className="main-area">
         <header className="topbar">
+          <button
+            type="button"
+            className="hamburger-button"
+            onClick={() => setSidebarAbierta(true)}
+            aria-label="Abrir menú"
+          >
+            <i className="fa-solid fa-bars"></i>
+          </button>
+
           <div className="topbar-search">
             <span className="search-icon">⌕</span>
             <input
@@ -639,29 +665,29 @@ function App() {
                     <tbody>
                       {entregasPaginadas.map((entrega) => (
                         <tr key={entrega.id}>
-                          <td className="code">{entrega.codigo}</td>
-                          <td>{entrega.cliente.nombre}</td>
-                          <td>{entrega.cliente.direccion}</td>
-                          <td>
+                          <td data-label="Código" className="code">{entrega.codigo}</td>
+                          <td data-label="Cliente">{entrega.cliente.nombre}</td>
+                          <td data-label="Dirección">{entrega.cliente.direccion}</td>
+                          <td data-label="Fecha / Hora">
                             <div className="date-cell">
                               <strong>{entrega.fechaEntrega}</strong>
                               <span>{entrega.horaEstimada}</span>
                             </div>
                           </td>
-                          <td>
+                          <td data-label="Prioridad">
                             <span
                               className={`pill priority-${entrega.prioridad}`}
                             >
                               {prioridadLabels[entrega.prioridad]}
                             </span>
                           </td>
-                          <td>
+                          <td data-label="Estado">
                             <span className={`pill status-${entrega.estado}`}>
                               {estadoLabels[entrega.estado]}
                             </span>
                           </td>
-                          <td>{entrega.repartidor.nombre}</td>
-                          <td>
+                          <td data-label="Repartidor">{entrega.repartidor.nombre}</td>
+                          <td data-label="Acción">
                             <button
                               type="button"
                               className="change-status-button"
