@@ -85,6 +85,30 @@ function normalizarTexto(valor: string): string {
     .trim();
 }
 
+function esNombreValido(v: string) {
+  const s = v.trim();
+  return s.length > 0 && s.length <= 25 && /^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$/.test(s);
+}
+
+function esTelefonoValido(v: string) {
+  return /^\d{4}-\d{4}$/.test(v);
+}
+
+function esDireccionValida(v: string) {
+  const s = v.trim();
+  return s.length > 0 && s.length <= 120;
+}
+
+function esDescripcionValida(v: string) {
+  const s = v.trim();
+  return s.length > 0 && s.length <= 120;
+}
+
+function formatearTelefono(valor: string): string {
+  const digits = valor.replace(/\D/g, "").slice(0, 8);
+  return digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits;
+}
+
 function App() {
   const [entregas, setEntregas] = useState<Entrega[]>([]);
   const [repartidores, setRepartidores] = useState<Usuario[]>([]);
@@ -110,6 +134,7 @@ function App() {
     crearFormularioNuevoPedido()
   );
   const [guardandoNuevaEntrega, setGuardandoNuevaEntrega] = useState(false);
+  const [intentoGuardar, setIntentoGuardar] = useState(false);
 
   useEffect(() => {
     async function cargarDatosIniciales() {
@@ -246,6 +271,7 @@ function App() {
 
     setModalNuevoPedidoAbierto(false);
     setNuevoPedidoForm(crearFormularioNuevoPedido(repartidores[0]?.id ?? ""));
+    setIntentoGuardar(false);
   }
 
   function actualizarCampoNuevoPedido<K extends keyof NuevoPedidoForm>(
@@ -318,6 +344,7 @@ function App() {
 
   async function guardarNuevaEntrega(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setIntentoGuardar(true);
 
     const clienteNombre = nuevoPedidoForm.clienteNombre.trim();
     const clienteTelefono = nuevoPedidoForm.clienteTelefono.trim();
@@ -326,21 +353,11 @@ function App() {
     const observaciones = nuevoPedidoForm.observaciones.trim();
 
     if (
-      !clienteNombre ||
-      !clienteTelefono ||
-      !clienteDireccion ||
-      !descripcionPedido ||
-      !nuevoPedidoForm.repartidorId ||
-      !nuevoPedidoForm.fechaEntrega ||
-      !nuevoPedidoForm.horaEstimada
+      !esNombreValido(nuevoPedidoForm.clienteNombre) ||
+      !esTelefonoValido(clienteTelefono) ||
+      !esDireccionValida(nuevoPedidoForm.clienteDireccion) ||
+      !esDescripcionValida(nuevoPedidoForm.descripcionPedido)
     ) {
-      await Swal.fire({
-        icon: "warning",
-        title: "Campos incompletos",
-        text: "Completa los datos obligatorios antes de guardar la entrega.",
-        confirmButtonText: "Aceptar",
-      });
-
       return;
     }
 
@@ -438,38 +455,7 @@ function App() {
             Entregas
           </button>
 
-          <button type="button" className="sidebar-link">
-            <span>□</span>
-            Dashboard
-          </button>
-
-          <button type="button" className="sidebar-link">
-            <span>⌁</span>
-            Rutas
-          </button>
-
-          <button type="button" className="sidebar-link">
-            <span>♙</span>
-            Conductores
-          </button>
-
-          <button type="button" className="sidebar-link">
-            <span>▤</span>
-            Reportes
-          </button>
         </nav>
-
-        <div className="sidebar-footer">
-          <button type="button" className="sidebar-link">
-            <span>⚙</span>
-            Ajustes
-          </button>
-
-          <button type="button" className="sidebar-link">
-            <span>↪</span>
-            Cerrar sesión
-          </button>
-        </div>
       </aside>
 
       <section className="main-area">
@@ -514,12 +500,11 @@ function App() {
               </p>
             </div>
 
-            <div className="scrum-badge">Sprint 1 · Prototipo Scrum</div>
           </section>
 
           <section className="metrics-grid">
             <article className="metric-card">
-              <div className="metric-icon blue">▣</div>
+              <div className="metric-icon blue"><i className="fa-solid fa-box"></i></div>
               <div>
                 <span>Total de entregas</span>
                 <strong>{metricas.total}</strong>
@@ -527,7 +512,7 @@ function App() {
             </article>
 
             <article className="metric-card">
-              <div className="metric-icon indigo">◷</div>
+              <div className="metric-icon indigo"><i className="fa-solid fa-clock"></i></div>
               <div>
                 <span>Pendientes</span>
                 <strong>{metricas.pendientes}</strong>
@@ -535,7 +520,7 @@ function App() {
             </article>
 
             <article className="metric-card">
-              <div className="metric-icon cyan">▱</div>
+              <div className="metric-icon cyan"><i className="fa-solid fa-truck"></i></div>
               <div>
                 <span>En ruta</span>
                 <strong>{metricas.enRuta}</strong>
@@ -543,7 +528,7 @@ function App() {
             </article>
 
             <article className="metric-card danger">
-              <div className="metric-icon red">!</div>
+              <div className="metric-icon red"><i className="fa-solid fa-circle-exclamation"></i></div>
               <div>
                 <span>Prioridad alta</span>
                 <strong>{metricas.prioritarias}</strong>
@@ -842,64 +827,87 @@ function App() {
                     Nombre del cliente *
                     <input
                       type="text"
+                      className={intentoGuardar && !esNombreValido(nuevoPedidoForm.clienteNombre) ? "invalid" : ""}
                       value={nuevoPedidoForm.clienteNombre}
-                      onChange={(event) =>
-                        actualizarCampoNuevoPedido(
-                          "clienteNombre",
-                          event.target.value
-                        )
-                      }
+                      onChange={(event) => {
+                        const v = event.target.value
+                          .replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]/g, "")
+                          .slice(0, 25);
+                        actualizarCampoNuevoPedido("clienteNombre", v);
+                      }}
                       placeholder="Ej. Juan Pérez"
                       disabled={guardandoNuevaEntrega}
                     />
+                    {intentoGuardar && !esNombreValido(nuevoPedidoForm.clienteNombre) && (
+                      <span className="field-error">
+                        {nuevoPedidoForm.clienteNombre.trim() === ""
+                          ? "Campo requerido"
+                          : "Solo letras, máx. 25 caracteres"}
+                      </span>
+                    )}
                   </label>
 
                   <label className="modal-field">
                     Teléfono *
                     <input
                       type="text"
+                      className={intentoGuardar && !esTelefonoValido(nuevoPedidoForm.clienteTelefono) ? "invalid" : ""}
                       value={nuevoPedidoForm.clienteTelefono}
                       onChange={(event) =>
                         actualizarCampoNuevoPedido(
                           "clienteTelefono",
-                          event.target.value
+                          formatearTelefono(event.target.value)
                         )
                       }
                       placeholder="Ej. 7777-7777"
+                      maxLength={9}
                       disabled={guardandoNuevaEntrega}
                     />
+                    {intentoGuardar && !esTelefonoValido(nuevoPedidoForm.clienteTelefono) && (
+                      <span className="field-error">Formato requerido: 0000-0000</span>
+                    )}
                   </label>
 
                   <label className="modal-field form-field-full">
                     Dirección *
                     <input
                       type="text"
+                      className={intentoGuardar && !esDireccionValida(nuevoPedidoForm.clienteDireccion) ? "invalid" : ""}
                       value={nuevoPedidoForm.clienteDireccion}
                       onChange={(event) =>
                         actualizarCampoNuevoPedido(
                           "clienteDireccion",
-                          event.target.value
+                          event.target.value.slice(0, 120)
                         )
                       }
                       placeholder="Ej. Colonia Escalón, San Salvador"
+                      maxLength={120}
                       disabled={guardandoNuevaEntrega}
                     />
+                    {intentoGuardar && !esDireccionValida(nuevoPedidoForm.clienteDireccion) && (
+                      <span className="field-error">Campo requerido, máx. 120 caracteres</span>
+                    )}
                   </label>
 
                   <label className="modal-field form-field-full">
                     Descripción del pedido *
                     <input
                       type="text"
+                      className={intentoGuardar && !esDescripcionValida(nuevoPedidoForm.descripcionPedido) ? "invalid" : ""}
                       value={nuevoPedidoForm.descripcionPedido}
                       onChange={(event) =>
                         actualizarCampoNuevoPedido(
                           "descripcionPedido",
-                          event.target.value
+                          event.target.value.slice(0, 120)
                         )
                       }
                       placeholder="Ej. Pedido de productos varios"
+                      maxLength={120}
                       disabled={guardandoNuevaEntrega}
                     />
+                    {intentoGuardar && !esDescripcionValida(nuevoPedidoForm.descripcionPedido) && (
+                      <span className="field-error">Campo requerido, máx. 120 caracteres</span>
+                    )}
                   </label>
 
                   <label className="modal-field">
@@ -977,12 +985,13 @@ function App() {
                       onChange={(event) =>
                         actualizarCampoNuevoPedido(
                           "observaciones",
-                          event.target.value
+                          event.target.value.slice(0, 120)
                         )
                       }
                       placeholder="Ej. Llamar antes de llegar"
                       disabled={guardandoNuevaEntrega}
-                      rows={3}
+                      maxLength={120}
+                      rows={2}
                     />
                   </label>
                 </div>
