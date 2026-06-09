@@ -50,7 +50,6 @@ function obtenerFechaActualInput(): string {
   const year = fecha.getFullYear();
   const month = String(fecha.getMonth() + 1).padStart(2, "0");
   const day = String(fecha.getDate()).padStart(2, "0");
-
   return `${year}-${month}-${day}`;
 }
 
@@ -68,12 +67,18 @@ function crearFormularioNuevoPedido(repartidorId = ""): NuevoPedidoForm {
   };
 }
 
+function esEstadoFinal(estado: EstadoEntrega): boolean {
+  return estado === "entregado" || estado === "cancelado";
+}
+
 function ordenarEntregas(entregas: Entrega[]): Entrega[] {
   return [...entregas].sort((a, b) => {
+    const aFinal = esEstadoFinal(a.estado);
+    const bFinal = esEstadoFinal(b.estado);
+    if (aFinal !== bFinal) return aFinal ? 1 : -1;
     const fechaA = `${a.fechaEntrega} ${a.horaEstimada}`;
     const fechaB = `${b.fechaEntrega} ${b.horaEstimada}`;
-
-    return fechaB.localeCompare(fechaA);
+    return fechaA.localeCompare(fechaB);
   });
 }
 
@@ -81,7 +86,7 @@ function normalizarTexto(valor: string): string {
   return valor
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .trim();
 }
 
@@ -109,6 +114,25 @@ function formatearTelefono(valor: string): string {
   return digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits;
 }
 
+function obtenerHoraActualInput(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function esFechaHoraValida(fecha: string, hora: string): boolean {
+  if (!fecha || !hora) return false;
+  const ahora = new Date();
+  ahora.setSeconds(0, 0);
+  const seleccionada = new Date(`${fecha}T${hora}`);
+  return seleccionada >= ahora;
+}
+
+function esEntregaVencida(entrega: Entrega): boolean {
+  if (esEstadoFinal(entrega.estado)) return false;
+  const fechaEntrega = new Date(`${entrega.fechaEntrega}T${entrega.horaEstimada}`);
+  return fechaEntrega < new Date();
+}
+
 function App() {
   const [entregas, setEntregas] = useState<Entrega[]>([]);
   const [repartidores, setRepartidores] = useState<Usuario[]>([]);
@@ -116,17 +140,14 @@ function App() {
   const [error, setError] = useState("");
   const [terminoBusqueda, setTerminoBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("todos");
-  const [filtroPrioridad, setFiltroPrioridad] =
-    useState<FiltroPrioridad>("todas");
+  const [filtroPrioridad, setFiltroPrioridad] = useState<FiltroPrioridad>("todas");
 
   const [paginaActual, setPaginaActual] = useState(1);
   const [registrosPorPagina, setRegistrosPorPagina] = useState(10);
 
   const [modalEstadoAbierto, setModalEstadoAbierto] = useState(false);
-  const [entregaSeleccionada, setEntregaSeleccionada] =
-    useState<Entrega | null>(null);
-  const [estadoTemporal, setEstadoTemporal] =
-    useState<EstadoEntrega>("pendiente");
+  const [entregaSeleccionada, setEntregaSeleccionada] = useState<Entrega | null>(null);
+  const [estadoTemporal, setEstadoTemporal] = useState<EstadoEntrega>("pendiente");
   const [guardandoEstado, setGuardandoEstado] = useState(false);
 
   const [modalNuevoPedidoAbierto, setModalNuevoPedidoAbierto] = useState(false);
@@ -135,19 +156,18 @@ function App() {
   );
   const [guardandoNuevaEntrega, setGuardandoNuevaEntrega] = useState(false);
   const [intentoGuardar, setIntentoGuardar] = useState(false);
-  const [sidebarAbierta, setSidebarAbierta] = useState(false);
+  const [modalDetalleAbierto, setModalDetalleAbierto] = useState(false);
+  const [entregaDetalle, setEntregaDetalle] = useState<Entrega | null>(null);
 
   useEffect(() => {
     async function cargarDatosIniciales() {
       try {
         setCargando(true);
         setError("");
-
         const [entregasData, repartidoresData] = await Promise.all([
           obtenerEntregas(),
           obtenerRepartidores(),
         ]);
-
         setEntregas(entregasData);
         setRepartidores(repartidoresData);
       } catch (error) {
@@ -157,41 +177,37 @@ function App() {
         setCargando(false);
       }
     }
-
     cargarDatosIniciales();
   }, []);
 
   const entregasFiltradas = useMemo(() => {
     const busquedaNormalizada = normalizarTexto(terminoBusqueda);
-
-    return entregas.filter((entrega) => {
+    const filtradas = entregas.filter((entrega) => {
       const coincideEstado =
-        filtroEstado === "todos" || entrega.estado === filtroEstado;
-
+        filtroEstado === "todos"
+          ? !esEstadoFinal(entrega.estado)
+          : entrega.estado === filtroEstado;
       const coincidePrioridad =
         filtroPrioridad === "todas" || entrega.prioridad === filtroPrioridad;
-
       const nombreClienteNormalizado = normalizarTexto(entrega.cliente.nombre);
       const direccionNormalizada = normalizarTexto(entrega.cliente.direccion);
-
       const coincideBusqueda =
         !busquedaNormalizada ||
         nombreClienteNormalizado.includes(busquedaNormalizada) ||
         direccionNormalizada.includes(busquedaNormalizada);
-
       return coincideEstado && coincidePrioridad && coincideBusqueda;
     });
+    return ordenarEntregas(filtradas);
   }, [entregas, filtroEstado, filtroPrioridad, terminoBusqueda]);
 
-  const totalPaginas = useMemo(() => {
-    return Math.max(1, Math.ceil(entregasFiltradas.length / registrosPorPagina));
-  }, [entregasFiltradas.length, registrosPorPagina]);
+  const totalPaginas = useMemo(
+    () => Math.max(1, Math.ceil(entregasFiltradas.length / registrosPorPagina)),
+    [entregasFiltradas.length, registrosPorPagina]
+  );
 
   const entregasPaginadas = useMemo(() => {
     const inicio = (paginaActual - 1) * registrosPorPagina;
-    const fin = inicio + registrosPorPagina;
-
-    return entregasFiltradas.slice(inicio, fin);
+    return entregasFiltradas.slice(inicio, inicio + registrosPorPagina);
   }, [entregasFiltradas, paginaActual, registrosPorPagina]);
 
   useEffect(() => {
@@ -199,40 +215,29 @@ function App() {
   }, [terminoBusqueda, filtroEstado, filtroPrioridad, registrosPorPagina]);
 
   useEffect(() => {
-    if (paginaActual > totalPaginas) {
-      setPaginaActual(totalPaginas);
-    }
+    if (paginaActual > totalPaginas) setPaginaActual(totalPaginas);
   }, [paginaActual, totalPaginas]);
 
-  const metricas = useMemo(() => {
-    return {
-      total: entregas.length,
-      pendientes: entregas.filter((entrega) => entrega.estado === "pendiente")
-        .length,
-      enRuta: entregas.filter((entrega) => entrega.estado === "en_ruta").length,
-      prioritarias: entregas.filter((entrega) => entrega.prioridad === "alta")
-        .length,
-    };
-  }, [entregas]);
+  const metricas = useMemo(() => ({
+    total: entregas.length,
+    pendientes: entregas.filter((e) => e.estado === "pendiente").length,
+    enRuta: entregas.filter((e) => e.estado === "en_ruta").length,
+    prioritarias: entregas.filter((e) => e.prioridad === "alta").length,
+  }), [entregas]);
 
   const registroInicial =
-    entregasFiltradas.length === 0
-      ? 0
-      : (paginaActual - 1) * registrosPorPagina + 1;
-
+    entregasFiltradas.length === 0 ? 0 : (paginaActual - 1) * registrosPorPagina + 1;
   const registroFinal = Math.min(
     paginaActual * registrosPorPagina,
     entregasFiltradas.length
   );
 
   function irPaginaAnterior() {
-    setPaginaActual((pagina) => Math.max(1, pagina - 1));
+    setPaginaActual((p) => Math.max(1, p - 1));
   }
-
   function irPaginaSiguiente() {
-    setPaginaActual((pagina) => Math.min(totalPaginas, pagina + 1));
+    setPaginaActual((p) => Math.min(totalPaginas, p + 1));
   }
-
   function limpiarBusqueda() {
     setTerminoBusqueda("");
   }
@@ -242,13 +247,20 @@ function App() {
     setEstadoTemporal(entrega.estado);
     setModalEstadoAbierto(true);
   }
-
   function cerrarModalCambioEstado() {
     if (guardandoEstado) return;
-
     setModalEstadoAbierto(false);
     setEntregaSeleccionada(null);
     setEstadoTemporal("pendiente");
+  }
+
+  function abrirModalDetalle(entrega: Entrega) {
+    setEntregaDetalle(entrega);
+    setModalDetalleAbierto(true);
+  }
+  function cerrarModalDetalle() {
+    setModalDetalleAbierto(false);
+    setEntregaDetalle(null);
   }
 
   function abrirModalNuevaEntrega() {
@@ -259,17 +271,13 @@ function App() {
         text: "No hay repartidores activos disponibles para asignar la entrega.",
         confirmButtonText: "Aceptar",
       });
-
       return;
     }
-
     setNuevoPedidoForm(crearFormularioNuevoPedido(repartidores[0].id));
     setModalNuevoPedidoAbierto(true);
   }
-
   function cerrarModalNuevaEntrega() {
     if (guardandoNuevaEntrega) return;
-
     setModalNuevoPedidoAbierto(false);
     setNuevoPedidoForm(crearFormularioNuevoPedido(repartidores[0]?.id ?? ""));
     setIntentoGuardar(false);
@@ -279,15 +287,11 @@ function App() {
     campo: K,
     valor: NuevoPedidoForm[K]
   ) {
-    setNuevoPedidoForm((formActual) => ({
-      ...formActual,
-      [campo]: valor,
-    }));
+    setNuevoPedidoForm((f) => ({ ...f, [campo]: valor }));
   }
 
   async function confirmarCambioEstado() {
     if (!entregaSeleccionada) return;
-
     if (entregaSeleccionada.estado === estadoTemporal) {
       await Swal.fire({
         icon: "info",
@@ -295,43 +299,28 @@ function App() {
         text: "La entrega ya tiene seleccionado ese estado.",
         confirmButtonText: "Entendido",
       });
-
       return;
     }
-
     try {
       setGuardandoEstado(true);
       setError("");
-
       await actualizarEstadoEntrega(entregaSeleccionada.id, estadoTemporal);
-
-      setEntregas((entregasActuales) =>
-        entregasActuales.map((entrega) =>
-          entrega.id === entregaSeleccionada.id
-            ? {
-                ...entrega,
-                estado: estadoTemporal,
-              }
-            : entrega
+      setEntregas((prev) =>
+        prev.map((e) =>
+          e.id === entregaSeleccionada.id ? { ...e, estado: estadoTemporal } : e
         )
       );
-
       setModalEstadoAbierto(false);
-
       await Swal.fire({
         icon: "success",
         title: "Estado actualizado",
-        text: `La entrega ${
-          entregaSeleccionada.codigo
-        } cambió a "${estadoLabels[estadoTemporal]}".`,
+        text: `La entrega ${entregaSeleccionada.codigo} cambió a "${estadoLabels[estadoTemporal]}".`,
         confirmButtonText: "Aceptar",
       });
-
       setEntregaSeleccionada(null);
       setEstadoTemporal("pendiente");
     } catch (error) {
       console.error(error);
-
       await Swal.fire({
         icon: "error",
         title: "Error al actualizar",
@@ -346,26 +335,23 @@ function App() {
   async function guardarNuevaEntrega(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIntentoGuardar(true);
-
     const clienteNombre = nuevoPedidoForm.clienteNombre.trim();
     const clienteTelefono = nuevoPedidoForm.clienteTelefono.trim();
     const clienteDireccion = nuevoPedidoForm.clienteDireccion.trim();
     const descripcionPedido = nuevoPedidoForm.descripcionPedido.trim();
     const observaciones = nuevoPedidoForm.observaciones.trim();
-
     if (
       !esNombreValido(nuevoPedidoForm.clienteNombre) ||
       !esTelefonoValido(clienteTelefono) ||
       !esDireccionValida(nuevoPedidoForm.clienteDireccion) ||
-      !esDescripcionValida(nuevoPedidoForm.descripcionPedido)
+      !esDescripcionValida(nuevoPedidoForm.descripcionPedido) ||
+      !esFechaHoraValida(nuevoPedidoForm.fechaEntrega, nuevoPedidoForm.horaEstimada)
     ) {
       return;
     }
-
     const repartidorSeleccionado = repartidores.find(
-      (repartidor) => repartidor.id === nuevoPedidoForm.repartidorId
+      (r) => r.id === nuevoPedidoForm.repartidorId
     );
-
     if (!repartidorSeleccionado) {
       await Swal.fire({
         icon: "warning",
@@ -373,41 +359,25 @@ function App() {
         text: "Selecciona un repartidor activo para la entrega.",
         confirmButtonText: "Aceptar",
       });
-
       return;
     }
-
     const nuevaEntregaInput: NuevaEntregaInput = {
-      cliente: {
-        nombre: clienteNombre,
-        telefono: clienteTelefono,
-        direccion: clienteDireccion,
-      },
+      cliente: { nombre: clienteNombre, telefono: clienteTelefono, direccion: clienteDireccion },
       descripcionPedido,
       prioridad: nuevoPedidoForm.prioridad,
       estado: "pendiente",
-      repartidor: {
-        id: repartidorSeleccionado.id,
-        nombre: repartidorSeleccionado.nombre,
-      },
+      repartidor: { id: repartidorSeleccionado.id, nombre: repartidorSeleccionado.nombre },
       fechaEntrega: nuevoPedidoForm.fechaEntrega,
       horaEstimada: nuevoPedidoForm.horaEstimada,
       observaciones: observaciones || "Sin observaciones",
     };
-
     try {
       setGuardandoNuevaEntrega(true);
       setError("");
-
       const entregaCreada = await crearEntrega(nuevaEntregaInput);
-
-      setEntregas((entregasActuales) =>
-        ordenarEntregas([entregaCreada, ...entregasActuales])
-      );
-
+      setEntregas((prev) => ordenarEntregas([entregaCreada, ...prev]));
       setModalNuevoPedidoAbierto(false);
       setNuevoPedidoForm(crearFormularioNuevoPedido(repartidores[0]?.id ?? ""));
-
       await Swal.fire({
         icon: "success",
         title: "Entrega registrada",
@@ -416,7 +386,6 @@ function App() {
       });
     } catch (error) {
       console.error(error);
-
       await Swal.fire({
         icon: "error",
         title: "Error al registrar",
@@ -429,73 +398,141 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
-      {sidebarAbierta && (
-        <div
-          className="sidebar-overlay"
-          onClick={() => setSidebarAbierta(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      <aside className={`sidebar${sidebarAbierta ? " abierta" : ""}`}>
-        <div className="sidebar-top">
-          <div className="brand">
-            <div className="brand-logo">
-              <img src={dmsLogo} alt="DMS - Delivery Management System" />
-            </div>
-            <div className="brand-text">
-              <strong>DMS</strong>
-              <span>Delivery Management System</span>
-            </div>
+    <div className="app-shell">
+      {/* ── Topbar ── */}
+      <header className="topbar">
+        <div className="topbar-brand">
+          <div className="brand-logo">
+            <img src={dmsLogo} alt="DMS - Delivery Management System" />
           </div>
-          <button
-            type="button"
-            className="sidebar-close-button"
-            onClick={() => setSidebarAbierta(false)}
-            aria-label="Cerrar menú"
-          >
-            <i className="fa-solid fa-xmark"></i>
-          </button>
+          <div className="brand-text">
+            <strong>DMS</strong>
+            <span>Delivery Management System</span>
+          </div>
         </div>
 
-        <button
-          type="button"
-          className="sidebar-primary-button"
-          onClick={() => { setSidebarAbierta(false); abrirModalNuevaEntrega(); }}
-        >
-          + Nueva entrega
-        </button>
-
-        <nav className="sidebar-nav" aria-label="Navegación principal">
-          <button type="button" className="sidebar-link active">
-            <span>▦</span>
+        <nav className="topbar-nav" aria-label="Navegación principal">
+          <button type="button" className="topbar-nav-link active">
+            <span className="topbar-nav-icon">▦</span>
             Entregas
           </button>
         </nav>
-      </aside>
 
-      <section className="main-area">
-        <header className="topbar">
-          <button
-            type="button"
-            className="hamburger-button"
-            onClick={() => setSidebarAbierta(true)}
-            aria-label="Abrir menú"
-          >
-            <i className="fa-solid fa-bars"></i>
-          </button>
+        <div className="topbar-actions">
+          <div className="notification-dot" aria-label="Notificaciones">•</div>
+          <div className="user-chip">
+            <span>S</span>
+            <strong>Admin User</strong>
+          </div>
+        </div>
+      </header>
 
-          <div className="topbar-search">
+      {/* ── Content ── */}
+      <div className="content-area">
+        <section className="page-heading">
+          <div>
+            <p className="page-eyebrow">Delivery Management System</p>
+            <h1>Panel de entregas</h1>
+            <p>Gestión básica de pedidos, entregas pendientes, estados y prioridad logística.</p>
+          </div>
+        </section>
+
+        <section className="metrics-grid">
+          <article className="metric-card">
+            <div className="metric-icon blue"><i className="fa-solid fa-box"></i></div>
+            <div>
+              <span>Total de entregas</span>
+              <strong>{metricas.total}</strong>
+            </div>
+          </article>
+          <article className="metric-card">
+            <div className="metric-icon indigo"><i className="fa-solid fa-clock"></i></div>
+            <div>
+              <span>Pendientes</span>
+              <strong>{metricas.pendientes}</strong>
+            </div>
+          </article>
+          <article className="metric-card">
+            <div className="metric-icon cyan"><i className="fa-solid fa-truck"></i></div>
+            <div>
+              <span>En ruta</span>
+              <strong>{metricas.enRuta}</strong>
+            </div>
+          </article>
+          <article className="metric-card danger">
+            <div className="metric-icon red"><i className="fa-solid fa-circle-exclamation"></i></div>
+            <div>
+              <span>Prioridad alta</span>
+              <strong>{metricas.prioritarias}</strong>
+            </div>
+          </article>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div className="panel-header-text">
+              <h2>Entregas registradas</h2>
+              <p>Visualización centralizada para localizar, priorizar y actualizar pedidos.</p>
+            </div>
+            <div className="panel-controls">
+              <button
+                type="button"
+                className="new-delivery-button"
+                onClick={abrirModalNuevaEntrega}
+              >
+                + Nueva entrega
+              </button>
+              <div className="filters">
+                <label>
+                  Estado
+                  <select
+                    value={filtroEstado}
+                    onChange={(e) => setFiltroEstado(e.target.value as FiltroEstado)}
+                  >
+                    <option value="todos">Activas</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_ruta">En ruta</option>
+                    <option value="entregado">Entregado</option>
+                    <option value="cancelado">Cancelado</option>
+                  </select>
+                </label>
+                <label>
+                  Prioridad
+                  <select
+                    value={filtroPrioridad}
+                    onChange={(e) => setFiltroPrioridad(e.target.value as FiltroPrioridad)}
+                  >
+                    <option value="todas">Todas</option>
+                    <option value="alta">Alta</option>
+                    <option value="media">Media</option>
+                    <option value="baja">Baja</option>
+                  </select>
+                </label>
+                <label>
+                  Ver
+                  <select
+                    value={registrosPorPagina}
+                    onChange={(e) => setRegistrosPorPagina(Number(e.target.value))}
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={30}>30</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Search below filters */}
+          <div className="panel-search">
             <span className="search-icon">⌕</span>
             <input
               type="text"
               value={terminoBusqueda}
-              onChange={(event) => setTerminoBusqueda(event.target.value)}
+              onChange={(e) => setTerminoBusqueda(e.target.value)}
               placeholder="Buscar por cliente o dirección"
               aria-label="Buscar por cliente o dirección"
             />
-
             {terminoBusqueda && (
               <button type="button" onClick={limpiarBusqueda}>
                 Limpiar
@@ -503,191 +540,68 @@ function App() {
             )}
           </div>
 
-          <div className="topbar-actions">
-            <div className="notification-dot" aria-label="Notificaciones">
-              •
-            </div>
+          {cargando && <p className="status-message">Cargando entregas...</p>}
+          {error && <p className="error-message">{error}</p>}
 
-            <div className="user-chip">
-              <span>S</span>
-              <strong>Admin User</strong>
-            </div>
-          </div>
-        </header>
-
-        <div className="content-area">
-          <section className="page-heading">
-            <div>
-              <p className="page-eyebrow">Delivery Management System</p>
-              <h1>Panel de entregas</h1>
-              <p>
-                Gestión básica de pedidos, entregas pendientes, estados y
-                prioridad logística.
-              </p>
-            </div>
-
-          </section>
-
-          <section className="metrics-grid">
-            <article className="metric-card">
-              <div className="metric-icon blue"><i className="fa-solid fa-box"></i></div>
-              <div>
-                <span>Total de entregas</span>
-                <strong>{metricas.total}</strong>
-              </div>
-            </article>
-
-            <article className="metric-card">
-              <div className="metric-icon indigo"><i className="fa-solid fa-clock"></i></div>
-              <div>
-                <span>Pendientes</span>
-                <strong>{metricas.pendientes}</strong>
-              </div>
-            </article>
-
-            <article className="metric-card">
-              <div className="metric-icon cyan"><i className="fa-solid fa-truck"></i></div>
-              <div>
-                <span>En ruta</span>
-                <strong>{metricas.enRuta}</strong>
-              </div>
-            </article>
-
-            <article className="metric-card danger">
-              <div className="metric-icon red"><i className="fa-solid fa-circle-exclamation"></i></div>
-              <div>
-                <span>Prioridad alta</span>
-                <strong>{metricas.prioritarias}</strong>
-              </div>
-            </article>
-          </section>
-
-          <section className="panel">
-            <div className="panel-header">
-              <div className="panel-header-text">
-                <h2>Entregas registradas</h2>
-                <p>
-                  Visualización centralizada para localizar, priorizar y
-                  actualizar pedidos.
-                </p>
+          {!cargando && !error && (
+            <>
+              <div className="table-summary">
+                <span>
+                  Mostrando {registroInicial} a {registroFinal} de{" "}
+                  {entregasFiltradas.length} entregas
+                </span>
               </div>
 
-              <div className="panel-controls">
-                <button
-                  type="button"
-                  className="new-delivery-button"
-                  onClick={abrirModalNuevaEntrega}
-                >
-                  + Nueva entrega
-                </button>
-
-                <div className="filters">
-                  <label>
-                    Estado
-                    <select
-                      value={filtroEstado}
-                      onChange={(event) =>
-                        setFiltroEstado(event.target.value as FiltroEstado)
-                      }
-                    >
-                      <option value="todos">Todos</option>
-                      <option value="pendiente">Pendiente</option>
-                      <option value="en_ruta">En ruta</option>
-                      <option value="entregado">Entregado</option>
-                      <option value="cancelado">Cancelado</option>
-                    </select>
-                  </label>
-
-                  <label>
-                    Prioridad
-                    <select
-                      value={filtroPrioridad}
-                      onChange={(event) =>
-                        setFiltroPrioridad(
-                          event.target.value as FiltroPrioridad
-                        )
-                      }
-                    >
-                      <option value="todas">Todas</option>
-                      <option value="alta">Alta</option>
-                      <option value="media">Media</option>
-                      <option value="baja">Baja</option>
-                    </select>
-                  </label>
-
-                  <label>
-                    Ver
-                    <select
-                      value={registrosPorPagina}
-                      onChange={(event) =>
-                        setRegistrosPorPagina(Number(event.target.value))
-                      }
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={30}>30</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {cargando && (
-              <p className="status-message">Cargando entregas...</p>
-            )}
-
-            {error && <p className="error-message">{error}</p>}
-
-            {!cargando && !error && (
-              <>
-                <div className="table-summary">
-                  <span>
-                    Mostrando {registroInicial} a {registroFinal} de{" "}
-                    {entregasFiltradas.length} entregas
-                  </span>
-                </div>
-
-                <div className="table-wrapper">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Código</th>
-                        <th>Cliente</th>
-                        <th>Dirección</th>
-                        <th>Fecha / Hora</th>
-                        <th>Prioridad</th>
-                        <th>Estado</th>
-                        <th>Repartidor</th>
-                        <th>Acción</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {entregasPaginadas.map((entrega) => (
-                        <tr key={entrega.id}>
-                          <td data-label="Código" className="code">{entrega.codigo}</td>
-                          <td data-label="Cliente">{entrega.cliente.nombre}</td>
-                          <td data-label="Dirección">{entrega.cliente.direccion}</td>
-                          <td data-label="Fecha / Hora">
-                            <div className="date-cell">
-                              <strong>{entrega.fechaEntrega}</strong>
-                              <span>{entrega.horaEstimada}</span>
-                            </div>
-                          </td>
-                          <td data-label="Prioridad">
-                            <span
-                              className={`pill priority-${entrega.prioridad}`}
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Código</th>
+                      <th>Cliente</th>
+                      <th>Dirección</th>
+                      <th>Fecha / Hora</th>
+                      <th>Prioridad</th>
+                      <th>Estado</th>
+                      <th>Repartidor</th>
+                      <th>Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {entregasPaginadas.map((entrega) => (
+                      <tr
+                        key={entrega.id}
+                        className={esEntregaVencida(entrega) ? "vencida" : undefined}
+                      >
+                        <td data-label="Código" className="code">{entrega.codigo}</td>
+                        <td data-label="Cliente">{entrega.cliente.nombre}</td>
+                        <td data-label="Dirección">{entrega.cliente.direccion}</td>
+                        <td data-label="Fecha / Hora">
+                          <div className="date-cell">
+                            <strong>{entrega.fechaEntrega}</strong>
+                            <span>{entrega.horaEstimada}</span>
+                          </div>
+                        </td>
+                        <td data-label="Prioridad">
+                          <span className={`pill priority-${entrega.prioridad}`}>
+                            {prioridadLabels[entrega.prioridad]}
+                          </span>
+                        </td>
+                        <td data-label="Estado">
+                          <span className={`pill status-${entrega.estado}`}>
+                            {estadoLabels[entrega.estado]}
+                          </span>
+                        </td>
+                        <td data-label="Repartidor">{entrega.repartidor.nombre}</td>
+                        <td data-label="Acción">
+                          {esEstadoFinal(entrega.estado) ? (
+                            <button
+                              type="button"
+                              className="detail-button"
+                              onClick={() => abrirModalDetalle(entrega)}
                             >
-                              {prioridadLabels[entrega.prioridad]}
-                            </span>
-                          </td>
-                          <td data-label="Estado">
-                            <span className={`pill status-${entrega.estado}`}>
-                              {estadoLabels[entrega.estado]}
-                            </span>
-                          </td>
-                          <td data-label="Repartidor">{entrega.repartidor.nombre}</td>
-                          <td data-label="Acción">
+                              Ver detalle
+                            </button>
+                          ) : (
                             <button
                               type="button"
                               className="change-status-button"
@@ -695,49 +609,41 @@ function App() {
                             >
                               Cambiar estado
                             </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
 
-                  {entregasFiltradas.length === 0 && (
-                    <p className="empty-message">
-                      No hay entregas que coincidan con la búsqueda o los
-                      filtros seleccionados.
-                    </p>
-                  )}
-                </div>
-
-                {entregasFiltradas.length > 0 && (
-                  <div className="pagination">
-                    <button
-                      type="button"
-                      onClick={irPaginaAnterior}
-                      disabled={paginaActual === 1}
-                    >
-                      Anterior
-                    </button>
-
-                    <span>
-                      Página {paginaActual} de {totalPaginas}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={irPaginaSiguiente}
-                      disabled={paginaActual === totalPaginas}
-                    >
-                      Siguiente
-                    </button>
-                  </div>
+                {entregasFiltradas.length === 0 && (
+                  <p className="empty-message">
+                    No hay entregas que coincidan con la búsqueda o los filtros seleccionados.
+                  </p>
                 )}
-              </>
-            )}
-          </section>
-        </div>
-      </section>
+              </div>
 
+              {entregasFiltradas.length > 0 && (
+                <div className="pagination">
+                  <button type="button" onClick={irPaginaAnterior} disabled={paginaActual === 1}>
+                    Anterior
+                  </button>
+                  <span>Página {paginaActual} de {totalPaginas}</span>
+                  <button
+                    type="button"
+                    onClick={irPaginaSiguiente}
+                    disabled={paginaActual === totalPaginas}
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </div>
+
+      {/* ── Modal: Cambiar estado ── */}
       {modalEstadoAbierto && entregaSeleccionada && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card">
@@ -746,7 +652,6 @@ function App() {
                 <p className="modal-eyebrow">Actualizar entrega</p>
                 <h3>Cambiar estado</h3>
               </div>
-
               <button
                 type="button"
                 className="modal-close-button"
@@ -757,37 +662,30 @@ function App() {
                 ×
               </button>
             </div>
-
             <div className="modal-body">
               <div className="delivery-detail-grid">
                 <div>
                   <span>Código</span>
                   <strong>{entregaSeleccionada.codigo}</strong>
                 </div>
-
                 <div>
                   <span>Cliente</span>
                   <strong>{entregaSeleccionada.cliente.nombre}</strong>
                 </div>
-
                 <div>
                   <span>Repartidor</span>
                   <strong>{entregaSeleccionada.repartidor.nombre}</strong>
                 </div>
-
                 <div>
                   <span>Estado actual</span>
                   <strong>{estadoLabels[entregaSeleccionada.estado]}</strong>
                 </div>
               </div>
-
               <label className="modal-field">
                 Nuevo estado
                 <select
                   value={estadoTemporal}
-                  onChange={(event) =>
-                    setEstadoTemporal(event.target.value as EstadoEntrega)
-                  }
+                  onChange={(e) => setEstadoTemporal(e.target.value as EstadoEntrega)}
                   disabled={guardandoEstado}
                 >
                   <option value="pendiente">Pendiente</option>
@@ -797,7 +695,6 @@ function App() {
                 </select>
               </label>
             </div>
-
             <div className="modal-actions">
               <button
                 type="button"
@@ -807,7 +704,6 @@ function App() {
               >
                 Cancelar
               </button>
-
               <button
                 type="button"
                 className="primary-button"
@@ -821,6 +717,7 @@ function App() {
         </div>
       )}
 
+      {/* ── Modal: Nueva entrega ── */}
       {modalNuevoPedidoAbierto && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card modal-card-large">
@@ -829,7 +726,6 @@ function App() {
                 <p className="modal-eyebrow">Nuevo pedido</p>
                 <h3>Registrar nueva entrega</h3>
               </div>
-
               <button
                 type="button"
                 className="modal-close-button"
@@ -840,23 +736,24 @@ function App() {
                 ×
               </button>
             </div>
-
             <form onSubmit={guardarNuevaEntrega}>
               <div className="modal-body">
                 <p className="modal-note">
-                  El estado inicial de una nueva entrega será{" "}
-                  <strong>Pendiente</strong>.
+                  El estado inicial de una nueva entrega será <strong>Pendiente</strong>.
                 </p>
-
                 <div className="form-grid">
                   <label className="modal-field">
                     Nombre del cliente *
                     <input
                       type="text"
-                      className={intentoGuardar && !esNombreValido(nuevoPedidoForm.clienteNombre) ? "invalid" : ""}
+                      className={
+                        intentoGuardar && !esNombreValido(nuevoPedidoForm.clienteNombre)
+                          ? "invalid"
+                          : ""
+                      }
                       value={nuevoPedidoForm.clienteNombre}
-                      onChange={(event) => {
-                        const v = event.target.value
+                      onChange={(e) => {
+                        const v = e.target.value
                           .replace(/[^a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]/g, "")
                           .slice(0, 25);
                         actualizarCampoNuevoPedido("clienteNombre", v);
@@ -877,12 +774,16 @@ function App() {
                     Teléfono *
                     <input
                       type="text"
-                      className={intentoGuardar && !esTelefonoValido(nuevoPedidoForm.clienteTelefono) ? "invalid" : ""}
+                      className={
+                        intentoGuardar && !esTelefonoValido(nuevoPedidoForm.clienteTelefono)
+                          ? "invalid"
+                          : ""
+                      }
                       value={nuevoPedidoForm.clienteTelefono}
-                      onChange={(event) =>
+                      onChange={(e) =>
                         actualizarCampoNuevoPedido(
                           "clienteTelefono",
-                          formatearTelefono(event.target.value)
+                          formatearTelefono(e.target.value)
                         )
                       }
                       placeholder="Ej. 7777-7777"
@@ -898,12 +799,16 @@ function App() {
                     Dirección *
                     <input
                       type="text"
-                      className={intentoGuardar && !esDireccionValida(nuevoPedidoForm.clienteDireccion) ? "invalid" : ""}
+                      className={
+                        intentoGuardar && !esDireccionValida(nuevoPedidoForm.clienteDireccion)
+                          ? "invalid"
+                          : ""
+                      }
                       value={nuevoPedidoForm.clienteDireccion}
-                      onChange={(event) =>
+                      onChange={(e) =>
                         actualizarCampoNuevoPedido(
                           "clienteDireccion",
-                          event.target.value.slice(0, 120)
+                          e.target.value.slice(0, 120)
                         )
                       }
                       placeholder="Ej. Colonia Escalón, San Salvador"
@@ -919,12 +824,16 @@ function App() {
                     Descripción del pedido *
                     <input
                       type="text"
-                      className={intentoGuardar && !esDescripcionValida(nuevoPedidoForm.descripcionPedido) ? "invalid" : ""}
+                      className={
+                        intentoGuardar && !esDescripcionValida(nuevoPedidoForm.descripcionPedido)
+                          ? "invalid"
+                          : ""
+                      }
                       value={nuevoPedidoForm.descripcionPedido}
-                      onChange={(event) =>
+                      onChange={(e) =>
                         actualizarCampoNuevoPedido(
                           "descripcionPedido",
-                          event.target.value.slice(0, 120)
+                          e.target.value.slice(0, 120)
                         )
                       }
                       placeholder="Ej. Pedido de productos varios"
@@ -940,11 +849,8 @@ function App() {
                     Prioridad *
                     <select
                       value={nuevoPedidoForm.prioridad}
-                      onChange={(event) =>
-                        actualizarCampoNuevoPedido(
-                          "prioridad",
-                          event.target.value as PrioridadEntrega
-                        )
+                      onChange={(e) =>
+                        actualizarCampoNuevoPedido("prioridad", e.target.value as PrioridadEntrega)
                       }
                       disabled={guardandoNuevaEntrega}
                     >
@@ -958,17 +864,14 @@ function App() {
                     Repartidor *
                     <select
                       value={nuevoPedidoForm.repartidorId}
-                      onChange={(event) =>
-                        actualizarCampoNuevoPedido(
-                          "repartidorId",
-                          event.target.value
-                        )
+                      onChange={(e) =>
+                        actualizarCampoNuevoPedido("repartidorId", e.target.value)
                       }
                       disabled={guardandoNuevaEntrega}
                     >
-                      {repartidores.map((repartidor) => (
-                        <option key={repartidor.id} value={repartidor.id}>
-                          {repartidor.nombre}
+                      {repartidores.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.nombre}
                         </option>
                       ))}
                     </select>
@@ -978,12 +881,16 @@ function App() {
                     Fecha de entrega *
                     <input
                       type="date"
+                      className={
+                        intentoGuardar &&
+                        !esFechaHoraValida(nuevoPedidoForm.fechaEntrega, nuevoPedidoForm.horaEstimada)
+                          ? "invalid"
+                          : ""
+                      }
                       value={nuevoPedidoForm.fechaEntrega}
-                      onChange={(event) =>
-                        actualizarCampoNuevoPedido(
-                          "fechaEntrega",
-                          event.target.value
-                        )
+                      min={obtenerFechaActualInput()}
+                      onChange={(e) =>
+                        actualizarCampoNuevoPedido("fechaEntrega", e.target.value)
                       }
                       disabled={guardandoNuevaEntrega}
                     />
@@ -993,25 +900,42 @@ function App() {
                     Hora estimada *
                     <input
                       type="time"
+                      className={
+                        intentoGuardar &&
+                        !esFechaHoraValida(nuevoPedidoForm.fechaEntrega, nuevoPedidoForm.horaEstimada)
+                          ? "invalid"
+                          : ""
+                      }
                       value={nuevoPedidoForm.horaEstimada}
-                      onChange={(event) =>
-                        actualizarCampoNuevoPedido(
-                          "horaEstimada",
-                          event.target.value
-                        )
+                      min={
+                        nuevoPedidoForm.fechaEntrega === obtenerFechaActualInput()
+                          ? obtenerHoraActualInput()
+                          : undefined
+                      }
+                      onChange={(e) =>
+                        actualizarCampoNuevoPedido("horaEstimada", e.target.value)
                       }
                       disabled={guardandoNuevaEntrega}
                     />
+                    {intentoGuardar &&
+                      !esFechaHoraValida(
+                        nuevoPedidoForm.fechaEntrega,
+                        nuevoPedidoForm.horaEstimada
+                      ) && (
+                        <span className="field-error">
+                          La fecha y hora no pueden ser del pasado
+                        </span>
+                      )}
                   </label>
 
                   <label className="modal-field form-field-full">
                     Observaciones
                     <textarea
                       value={nuevoPedidoForm.observaciones}
-                      onChange={(event) =>
+                      onChange={(e) =>
                         actualizarCampoNuevoPedido(
                           "observaciones",
-                          event.target.value.slice(0, 120)
+                          e.target.value.slice(0, 120)
                         )
                       }
                       placeholder="Ej. Llamar antes de llegar"
@@ -1022,7 +946,6 @@ function App() {
                   </label>
                 </div>
               </div>
-
               <div className="modal-actions">
                 <button
                   type="button"
@@ -1032,7 +955,6 @@ function App() {
                 >
                   Cancelar
                 </button>
-
                 <button
                   type="submit"
                   className="primary-button"
@@ -1045,7 +967,93 @@ function App() {
           </div>
         </div>
       )}
-    </main>
+
+      {/* ── Modal: Detalle ── */}
+      {modalDetalleAbierto && entregaDetalle && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-card">
+            <div className="modal-header">
+              <div>
+                <p className="modal-eyebrow">Información completa</p>
+                <h3>Detalle de entrega</h3>
+              </div>
+              <button
+                type="button"
+                className="modal-close-button"
+                onClick={cerrarModalDetalle}
+                aria-label="Cerrar modal"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="detail-grid">
+                <div className="detail-item">
+                  <span>Código</span>
+                  <strong className="code">{entregaDetalle.codigo}</strong>
+                </div>
+                <div className="detail-item">
+                  <span>Estado</span>
+                  <span className={`pill status-${entregaDetalle.estado}`}>
+                    {estadoLabels[entregaDetalle.estado]}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span>Prioridad</span>
+                  <span className={`pill priority-${entregaDetalle.prioridad}`}>
+                    {prioridadLabels[entregaDetalle.prioridad]}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span>Repartidor</span>
+                  <strong>{entregaDetalle.repartidor.nombre}</strong>
+                </div>
+                <div className="detail-item">
+                  <span>Cliente</span>
+                  <strong>{entregaDetalle.cliente.nombre}</strong>
+                </div>
+                <div className="detail-item">
+                  <span>Teléfono</span>
+                  <strong>{entregaDetalle.cliente.telefono}</strong>
+                </div>
+                <div className="detail-item">
+                  <span>Fecha de entrega</span>
+                  <strong>{entregaDetalle.fechaEntrega}</strong>
+                </div>
+                <div className="detail-item">
+                  <span>Hora estimada</span>
+                  <strong>{entregaDetalle.horaEstimada}</strong>
+                </div>
+                <div className="detail-item detail-item-full">
+                  <span>Dirección</span>
+                  <strong>{entregaDetalle.cliente.direccion}</strong>
+                </div>
+                <div className="detail-item detail-item-full">
+                  <span>Descripción del pedido</span>
+                  <strong>{entregaDetalle.descripcionPedido}</strong>
+                </div>
+                {entregaDetalle.observaciones &&
+                  entregaDetalle.observaciones !== "Sin observaciones" && (
+                    <div className="detail-item detail-item-full">
+                      <span>Observaciones</span>
+                      <strong>{entregaDetalle.observaciones}</strong>
+                    </div>
+                  )}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={cerrarModalDetalle}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
