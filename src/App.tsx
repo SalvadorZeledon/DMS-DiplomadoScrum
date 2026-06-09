@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import "sweetalert2/dist/sweetalert2.min.css";
-import dmsLogo from "./assets/logo-dms.png";
+import dmsLogo from "./assets/udb_logo.jpg";
 import "./App.css";
 import {
   actualizarEstadoEntrega,
@@ -646,11 +646,16 @@ function App() {
       {/* ── Modal: Cambiar estado ── */}
       {modalEstadoAbierto && entregaSeleccionada && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-card">
-            <div className="modal-header">
-              <div>
+          <div className="modal-card modal-card-status">
+            <div className="modal-header modal-header-illustrated modal-header-status">
+              <div className="modal-header-content">
                 <p className="modal-eyebrow">Actualizar entrega</p>
                 <h3>Cambiar estado</h3>
+                <p className="modal-subtitle">Actualiza el estado actual de la entrega.</p>
+              </div>
+              <div className="modal-header-art" aria-hidden="true">
+                <span>↻</span>
+                <span>✓</span>
               </div>
               <button
                 type="button"
@@ -662,27 +667,52 @@ function App() {
                 ×
               </button>
             </div>
-            <div className="modal-body">
-              <div className="delivery-detail-grid">
-                <div>
-                  <span>Código</span>
-                  <strong>{entregaSeleccionada.codigo}</strong>
+            <div className="modal-body modal-body-status">
+              <div className="delivery-detail-grid status-info-grid">
+                <div className="status-info-card">
+                  <span className="info-card-icon">
+                    <i className="fa-solid fa-barcode" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Código</span>
+                    <strong>{entregaSeleccionada.codigo}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Cliente</span>
-                  <strong>{entregaSeleccionada.cliente.nombre}</strong>
+                <div className="status-info-card">
+                  <span className="info-card-icon purple">
+                    <i className="fa-solid fa-user" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Cliente</span>
+                    <strong>{entregaSeleccionada.cliente.nombre}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Repartidor</span>
-                  <strong>{entregaSeleccionada.repartidor.nombre}</strong>
+                <div className="status-info-card">
+                  <span className="info-card-icon teal">
+                    <i className="fa-solid fa-motorcycle" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Repartidor</span>
+                    <strong>{entregaSeleccionada.repartidor.nombre}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Estado actual</span>
-                  <strong>{estadoLabels[entregaSeleccionada.estado]}</strong>
+                <div className="status-info-card">
+                  <span className="info-card-icon blue">
+                    <i className="fa-solid fa-tag" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Estado actual</span>
+                    <strong className={`pill status-${entregaSeleccionada.estado}`}>
+                      {estadoLabels[entregaSeleccionada.estado]}
+                    </strong>
+                  </div>
                 </div>
               </div>
-              <label className="modal-field">
-                Nuevo estado
+              <label className="modal-field modal-field-status">
+                <span className="field-title-with-icon">
+                  <span aria-hidden="true">↻</span>
+                  Nuevo estado
+                </span>
                 <select
                   value={estadoTemporal}
                   onChange={(e) => setEstadoTemporal(e.target.value as EstadoEntrega)}
@@ -695,7 +725,7 @@ function App() {
                 </select>
               </label>
             </div>
-            <div className="modal-actions">
+            <div className="modal-actions modal-actions-status">
               <button
                 type="button"
                 className="secondary-button"
@@ -710,6 +740,7 @@ function App() {
                 onClick={confirmarCambioEstado}
                 disabled={guardandoEstado}
               >
+                <span aria-hidden="true">✓</span>
                 {guardandoEstado ? "Guardando..." : "Confirmar cambio"}
               </button>
             </div>
@@ -721,10 +752,18 @@ function App() {
       {modalNuevoPedidoAbierto && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-card modal-card-large">
-            <div className="modal-header">
-              <div>
+            <div className="modal-header modal-header-new-delivery">
+              <div className="modal-header-content">
                 <p className="modal-eyebrow">Nuevo pedido</p>
                 <h3>Registrar nueva entrega</h3>
+                <p className="modal-subtitle">
+                  Completa los datos necesarios para registrar una nueva entrega.
+                </p>
+              </div>
+              <div className="modal-header-art" aria-hidden="true">
+                <span>✦</span>
+                <span>📦</span>
+                <span>⌖</span>
               </div>
               <button
                 type="button"
@@ -738,10 +777,17 @@ function App() {
             </div>
             <form onSubmit={guardarNuevaEntrega}>
               <div className="modal-body">
-                <p className="modal-note">
-                  El estado inicial de una nueva entrega será <strong>Pendiente</strong>.
+                <p className="modal-note modal-note-status">
+                  <span className="modal-note-icon" aria-hidden="true">i</span>
+                  <span>Estado inicial:</span>
+                  <strong>Pendiente</strong>
                 </p>
                 <div className="form-grid">
+                  <div className="form-section-title form-field-full">
+                    <span className="form-section-icon" aria-hidden="true">👤</span>
+                    <strong>Información del cliente</strong>
+                  </div>
+
                   <label className="modal-field">
                     Nombre del cliente *
                     <input
@@ -819,6 +865,11 @@ function App() {
                       <span className="field-error">Campo requerido, máx. 120 caracteres</span>
                     )}
                   </label>
+
+                  <div className="form-section-title form-field-full">
+                    <span className="form-section-icon" aria-hidden="true">▧</span>
+                    <strong>Detalle de la entrega</strong>
+                  </div>
 
                   <label className="modal-field form-field-full">
                     Descripción del pedido *
@@ -928,6 +979,11 @@ function App() {
                       )}
                   </label>
 
+                  <div className="form-section-title form-field-full">
+                    <span className="form-section-icon" aria-hidden="true">💬</span>
+                    <strong>Observaciones</strong>
+                  </div>
+
                   <label className="modal-field form-field-full">
                     Observaciones
                     <textarea
@@ -971,11 +1027,16 @@ function App() {
       {/* ── Modal: Detalle ── */}
       {modalDetalleAbierto && entregaDetalle && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-card">
-            <div className="modal-header">
-              <div>
+          <div className="modal-card modal-card-detail">
+            <div className="modal-header modal-header-illustrated modal-header-detail">
+              <div className="modal-header-content">
                 <p className="modal-eyebrow">Información completa</p>
                 <h3>Detalle de entrega</h3>
+                <p className="modal-subtitle">Consulta toda la información registrada de la entrega.</p>
+              </div>
+              <div className="modal-header-art" aria-hidden="true">
+                <span>⌖</span>
+                <span>📦</span>
               </div>
               <button
                 type="button"
@@ -986,62 +1047,117 @@ function App() {
                 ×
               </button>
             </div>
-            <div className="modal-body">
-              <div className="detail-grid">
+            <div className="modal-body modal-body-detail">
+              <div className="detail-grid detail-grid-modern">
                 <div className="detail-item">
-                  <span>Código</span>
-                  <strong className="code">{entregaDetalle.codigo}</strong>
-                </div>
-                <div className="detail-item">
-                  <span>Estado</span>
-                  <span className={`pill status-${entregaDetalle.estado}`}>
-                    {estadoLabels[entregaDetalle.estado]}
+                  <span className="detail-icon">
+                    <i className="fa-solid fa-barcode" aria-hidden="true"></i>
                   </span>
+                  <div>
+                    <span>Código</span>
+                    <strong className="code">{entregaDetalle.codigo}</strong>
+                  </div>
                 </div>
                 <div className="detail-item">
-                  <span>Prioridad</span>
-                  <span className={`pill priority-${entregaDetalle.prioridad}`}>
-                    {prioridadLabels[entregaDetalle.prioridad]}
+                  <span className="detail-icon green">
+                    <i className="fa-solid fa-circle-check" aria-hidden="true"></i>
                   </span>
+                  <div>
+                    <span>Estado</span>
+                    <span className={`pill status-${entregaDetalle.estado}`}>
+                      {estadoLabels[entregaDetalle.estado]}
+                    </span>
+                  </div>
                 </div>
                 <div className="detail-item">
-                  <span>Repartidor</span>
-                  <strong>{entregaDetalle.repartidor.nombre}</strong>
+                  <span className="detail-icon green">
+                    <i className="fa-solid fa-flag" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Prioridad</span>
+                    <span className={`pill priority-${entregaDetalle.prioridad}`}>
+                      {prioridadLabels[entregaDetalle.prioridad]}
+                    </span>
+                  </div>
                 </div>
                 <div className="detail-item">
-                  <span>Cliente</span>
-                  <strong>{entregaDetalle.cliente.nombre}</strong>
+                  <span className="detail-icon teal">
+                    <i className="fa-solid fa-motorcycle" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Repartidor</span>
+                    <strong>{entregaDetalle.repartidor.nombre}</strong>
+                  </div>
                 </div>
                 <div className="detail-item">
-                  <span>Teléfono</span>
-                  <strong>{entregaDetalle.cliente.telefono}</strong>
+                  <span className="detail-icon purple">
+                    <i className="fa-solid fa-user" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Cliente</span>
+                    <strong>{entregaDetalle.cliente.nombre}</strong>
+                  </div>
                 </div>
                 <div className="detail-item">
-                  <span>Fecha de entrega</span>
-                  <strong>{entregaDetalle.fechaEntrega}</strong>
+                  <span className="detail-icon">
+                    <i className="fa-solid fa-phone" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Teléfono</span>
+                    <strong>{entregaDetalle.cliente.telefono}</strong>
+                  </div>
                 </div>
                 <div className="detail-item">
-                  <span>Hora estimada</span>
-                  <strong>{entregaDetalle.horaEstimada}</strong>
+                  <span className="detail-icon">
+                    <i className="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Fecha de entrega</span>
+                    <strong>{entregaDetalle.fechaEntrega}</strong>
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-icon">
+                    <i className="fa-solid fa-clock" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Hora estimada</span>
+                    <strong>{entregaDetalle.horaEstimada}</strong>
+                  </div>
                 </div>
                 <div className="detail-item detail-item-full">
-                  <span>Dirección</span>
-                  <strong>{entregaDetalle.cliente.direccion}</strong>
+                  <span className="detail-icon">
+                    <i className="fa-solid fa-location-dot" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Dirección</span>
+                    <strong>{entregaDetalle.cliente.direccion}</strong>
+                  </div>
                 </div>
                 <div className="detail-item detail-item-full">
-                  <span>Descripción del pedido</span>
-                  <strong>{entregaDetalle.descripcionPedido}</strong>
+                  <span className="detail-icon">
+                    <i className="fa-solid fa-box" aria-hidden="true"></i>
+                  </span>
+                  <div>
+                    <span>Descripción del pedido</span>
+                    <strong>{entregaDetalle.descripcionPedido}</strong>
+                  </div>
                 </div>
                 {entregaDetalle.observaciones &&
                   entregaDetalle.observaciones !== "Sin observaciones" && (
-                    <div className="detail-item detail-item-full">
-                      <span>Observaciones</span>
-                      <strong>{entregaDetalle.observaciones}</strong>
+                    <div className="detail-item detail-item-full detail-item-optional">
+                      <span className="detail-icon">
+                        <i className="fa-solid fa-comment" aria-hidden="true"></i>
+                      </span>
+                      <div>
+                        <span>Observaciones</span>
+                        <strong>{entregaDetalle.observaciones}</strong>
+                      </div>
                     </div>
                   )}
               </div>
             </div>
-            <div className="modal-actions">
+            <div className="modal-actions modal-actions-detail">
               <button
                 type="button"
                 className="secondary-button"
