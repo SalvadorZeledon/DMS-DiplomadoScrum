@@ -677,7 +677,7 @@ tbody tr.vencida:hover { background: #fee2e2; }
   background: #f8fafc;
 }
 
-.delivery-detail-grid span {
+.delivery-detail-grid span:not(.info-card-icon):not(.detail-icon) {
   display: block;
   margin-bottom: 4px;
   color: #64748b;
