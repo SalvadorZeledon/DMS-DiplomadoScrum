@@ -739,7 +739,7 @@ tbody tr.vencida:hover { background: #fee2e2; }
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .form-field-full {
@@ -748,7 +748,7 @@ tbody tr.vencida:hover { background: #fee2e2; }
 
 .modal-field {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   color: #475569;
   font-size: 0.8rem;
   font-weight: 900;
@@ -758,7 +758,7 @@ tbody tr.vencida:hover { background: #fee2e2; }
 .modal-field textarea,
 .modal-field select {
   width: 100%;
-  padding: 7px 10px;
+  padding: 5px 9px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   color: #111827;
@@ -1600,6 +1600,9 @@ tbody tr.vencida:hover {
 ────────────────────────────────────────────── */
 
 .modal-card.modal-card-large {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid rgba(147, 197, 253, 0.75);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 251, 255, 0.98) 100%);
@@ -1641,23 +1644,23 @@ tbody tr.vencida:hover {
 }
 
 .modal-header-new-delivery .modal-eyebrow {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   color: #1d4ed8;
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   letter-spacing: 0.22em;
 }
 
 .modal-header-new-delivery h3 {
   color: #0b174f;
-  font-size: 1.48rem;
+  font-size: 1.28rem;
   line-height: 1.08;
   letter-spacing: -0.04em;
 }
 
 .modal-subtitle {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   color: #50627f;
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 650;
 }
 
@@ -1701,8 +1704,18 @@ tbody tr.vencida:hover {
   background: #fff1f2;
 }
 
+.modal-card-large form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .modal-card-large .modal-body {
-  padding: 14px 28px 18px;
+  padding: 10px 22px 12px;
+  overflow-y: auto;
+  flex: 1;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 251, 255, 0.96) 100%);
 }
@@ -1711,7 +1724,7 @@ tbody tr.vencida:hover {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin: 0 0 16px;
+  margin: 0 0 10px;
   padding: 9px 12px;
   border: 1px solid #b8d4ff;
   border-radius: 12px;
@@ -1751,7 +1764,7 @@ tbody tr.vencida:hover {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin: 2px 0 2px;
+  margin: 4px 0 0;
   color: #0b174f;
   font-size: 0.86rem;
   font-weight: 900;
@@ -1868,7 +1881,8 @@ tbody tr.vencida:hover {
 }
 
 .modal-card-large .modal-actions {
-  padding: 14px 28px 16px;
+  padding: 10px 22px 12px;
+  flex-shrink: 0;
   border-top: 1px solid #dbe7ff;
   background:
     linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
@@ -1945,13 +1959,16 @@ tbody tr.vencida:hover {
 .modal-card-detail {
   width: min(100%, 880px);
   max-height: 95dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-header-illustrated {
   position: relative;
   overflow: hidden;
-  min-height: 96px;
-  padding: 18px 34px 16px;
+  min-height: 108px;
+  padding: 20px 28px 18px;
   border-bottom: 1px solid #cbd7ff;
   background:
     radial-gradient(circle at 84% 28%, rgba(96, 165, 250, 0.24), transparent 34%),
@@ -1972,8 +1989,7 @@ tbody tr.vencida:hover {
 }
 
 .modal-header-illustrated .modal-header-content,
-.modal-header-illustrated .modal-close-button,
-.modal-header-illustrated .modal-header-art {
+.modal-header-illustrated .modal-close-button {
   position: relative;
   z-index: 1;
 }
@@ -1985,34 +2001,22 @@ tbody tr.vencida:hover {
 }
 
 .modal-header-illustrated h3 {
-  margin-top: 4px;
+  margin-top: 2px;
   color: #08164a;
-  font-size: 1.72rem;
-  letter-spacing: -0.045em;
+  font-size: 1.28rem;
+  letter-spacing: -0.04em;
 }
 
 .modal-header-illustrated .modal-subtitle {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: #52627e;
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   font-weight: 650;
 }
 
 .modal-header-illustrated .modal-header-art {
-  right: 86px;
-  opacity: 0.32;
-}
-
-.modal-header-status .modal-header-art span:first-child,
-.modal-header-detail .modal-header-art span:first-child {
-  color: #2457d6;
-  font-size: 4.6rem;
-}
-
-.modal-header-status .modal-header-art span:last-child,
-.modal-header-detail .modal-header-art span:last-child {
-  color: #7c3aed;
-  font-size: 3rem;
+  right: 74px;
+  top: 25px;
 }
 
 .modal-card-status .modal-close-button,
@@ -2207,22 +2211,24 @@ tbody tr.vencida:hover {
 
 /* Detalle de entrega */
 .modal-body-detail {
-  padding: 16px 34px 14px;
+  padding: 10px 24px 10px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .detail-grid-modern {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 12px;
+  gap: 7px 10px;
   margin: 0;
 }
 
 .detail-grid-modern .detail-item {
-  min-height: 66px;
+  min-height: 52px;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 14px;
-  padding: 11px 14px;
+  gap: 10px;
+  padding: 8px 12px;
   border-color: #d7e0ff;
   border-radius: 15px;
   background:
@@ -2232,11 +2238,19 @@ tbody tr.vencida:hover {
 
 .detail-grid-modern .detail-item-full {
   grid-column: 1 / -1;
-  min-height: 58px;
+  min-height: 46px;
 }
 
 .detail-grid-modern .detail-item > div {
   min-width: 0;
+}
+
+.detail-grid-modern .detail-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  flex-shrink: 0;
 }
 
 .detail-grid-modern .detail-item strong,
@@ -2267,8 +2281,9 @@ tbody tr.vencida:hover {
 
 .modal-card-detail .modal-actions-detail {
   justify-content: flex-end;
-  padding-top: 12px;
-  padding-bottom: 14px;
+  padding-top: 8px;
+  padding-bottom: 10px;
+  flex-shrink: 0;
 }
 
 .modal-card-detail .secondary-button {
@@ -2278,13 +2293,13 @@ tbody tr.vencida:hover {
 /* Ajustes responsivos para mantener los modales compactos */
 @media (max-height: 760px) and (min-width: 700px) {
   .modal-header-illustrated {
-    min-height: 82px;
+    min-height: 88px;
     padding-top: 14px;
     padding-bottom: 12px;
   }
 
   .modal-header-illustrated h3 {
-    font-size: 1.45rem;
+    font-size: 1.28rem;
   }
 
   .modal-header-illustrated .modal-subtitle {
